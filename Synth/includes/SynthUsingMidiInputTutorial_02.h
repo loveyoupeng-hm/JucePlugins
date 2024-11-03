@@ -46,6 +46,11 @@
 
 
 #pragma once
+#include <math.h>
+#include <float.h>
+#include <juce_audio_processors/juce_audio_processors.h>
+#include <juce_audio_basics/juce_audio_basics.h>
+
 
 //==============================================================================
 struct SineWaveSound   : public juce::SynthesiserSound
@@ -95,12 +100,14 @@ struct SineWaveVoice   : public juce::SynthesiserVoice
 
     void pitchWheelMoved (int) override      {}
     void controllerMoved (int, int) override {}
+    
+    void renderNextBlock (juce::AudioBuffer<double>&, int, int) override {}
 
     void renderNextBlock (juce::AudioSampleBuffer& outputBuffer, int startSample, int numSamples) override
     {
         if (angleDelta != 0.0)
         {
-            if (tailOff > 0.0) // [7]
+            if (fabs(tailOff - 0.0) > DBL_EPSILON) // [7]
             {
                 while (--numSamples >= 0)
                 {
@@ -114,7 +121,7 @@ struct SineWaveVoice   : public juce::SynthesiserVoice
 
                     tailOff *= 0.99; // [8]
 
-                    if (tailOff <= 0.005)
+                    if (fabs(tailOff - 0.005) > DBL_EPSILON)
                     {
                         clearCurrentNote(); // [9]
 

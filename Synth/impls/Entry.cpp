@@ -7,7 +7,7 @@
 */
 
 #include <JuceHeader.h>
-#include "SynthUsingMidiInputTutorial_01.h"
+#include "SynthUsingMidiInputTutorial_02.h"
 
 class Application    : public juce::JUCEApplication
 {
