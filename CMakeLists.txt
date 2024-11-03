@@ -31,4 +31,5 @@ add_compile_options(-Wall -Wextra -Wpedantic)
 
 add_subdirectory(ArpeggiatorPlugin)
 add_subdirectory(HelloWorld)
+add_subdirectory(Synth)
 add_subdirectory(Tests)
