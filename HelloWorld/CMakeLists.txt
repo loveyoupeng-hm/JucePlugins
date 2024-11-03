@@ -1,15 +1,14 @@
 cmake_minimum_required(VERSION 3.28)
 
-project(ArpeggiatorPlugin VERSION 0.1.0)
+project(HelloWorld VERSION 0.1.0)
 
 juce_add_plugin(
     ${PROJECT_NAME}
     COMPANY_NAME loveyoupeng
     IS_SYNTH FALSE
-    IS_MIDI_EFFECT TRUE
     NEEDS_MIDI_INPUT TRUE
     NEEDS_MIDI_OUTPUT TRUE
-    FORMATS VST3 Standalone
+    FORMATS VST3
 )
 target_compile_definitions(
     ${PROJECT_NAME} 
@@ -38,5 +37,6 @@ target_include_directories(
 target_sources(
     ${PROJECT_NAME}
     PRIVATE
-        impls/ArpeggiatorPluginDemo.cpp
+        impls/PluginEditor.cpp
+        impls/PluginProcessor.cpp
 )

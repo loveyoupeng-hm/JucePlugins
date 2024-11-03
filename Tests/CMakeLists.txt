@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.28)
 
-project(ArpeggiatorPluginTest)
+project(PluginTests)
 
 enable_testing()
 
@@ -10,14 +10,14 @@ target_include_directories(
     ${PROJECT_NAME}
     PRIVATE
         ${GOOGLE_TEST_SOURCE_DIR}/googletest/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/../ArpeggiatorPlugin/includes
+        ${CMAKE_CURRENT_SOURCE_DIR}/../HelloWorld/includes
         ${JUCE_SOURCE_DIR}/modules
 )
 
 target_link_libraries(
     ${PROJECT_NAME}
     PRIVATE
-        ArpeggiatorPlugin
+        HelloWorld
         GTest::gtest_main
 )
 
