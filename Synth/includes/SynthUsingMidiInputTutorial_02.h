@@ -64,7 +64,7 @@ struct SineWaveSound   : public juce::SynthesiserSound
 //==============================================================================
 struct SineWaveVoice   : public juce::SynthesiserVoice
 {
-    SineWaveVoice() {}
+    SineWaveVoice(int _harm): harm{_harm} {}
 
     bool canPlaySound (juce::SynthesiserSound* sound) override
     {
@@ -79,7 +79,7 @@ struct SineWaveVoice   : public juce::SynthesiserVoice
         tailOff = 0.0;
 
         auto cyclesPerSecond = juce::MidiMessage::getMidiNoteInHertz (midiNoteNumber);
-        auto cyclesPerSample = cyclesPerSecond / getSampleRate();
+        auto cyclesPerSample = harm * cyclesPerSecond / getSampleRate();
 
         angleDelta = cyclesPerSample * 2.0 * juce::MathConstants<double>::pi;
     }
@@ -88,7 +88,7 @@ struct SineWaveVoice   : public juce::SynthesiserVoice
     {
         if (allowTailOff)
         {
-            if (tailOff == 0.0)
+            if (fabs(tailOff - 0.0) < DBL_EPSILON)
                 tailOff = 1.0;
         }
         else
@@ -105,13 +105,13 @@ struct SineWaveVoice   : public juce::SynthesiserVoice
 
     void renderNextBlock (juce::AudioSampleBuffer& outputBuffer, int startSample, int numSamples) override
     {
-        if (angleDelta != 0.0)
+        if (fabs(angleDelta - 0.0) > DBL_EPSILON)
         {
             if (fabs(tailOff - 0.0) > DBL_EPSILON) // [7]
             {
                 while (--numSamples >= 0)
                 {
-                    auto currentSample = (float) (std::sin (currentAngle) * level * tailOff);
+                    auto currentSample = (float) (std::sin (currentAngle) * level * tailOff) / harm;
 
                     for (auto i = outputBuffer.getNumChannels(); --i >= 0;)
                         outputBuffer.addSample (i, startSample, currentSample);
@@ -121,7 +121,7 @@ struct SineWaveVoice   : public juce::SynthesiserVoice
 
                     tailOff *= 0.99; // [8]
 
-                    if (fabs(tailOff - 0.005) > DBL_EPSILON)
+                    if (tailOff < 0.005)
                     {
                         clearCurrentNote(); // [9]
 
@@ -148,6 +148,7 @@ struct SineWaveVoice   : public juce::SynthesiserVoice
 
 private:
     double currentAngle = 0.0, angleDelta = 0.0, level = 0.0, tailOff = 0.0;
+    int harm;
 };
 
 //==============================================================================
@@ -157,8 +158,8 @@ public:
     SynthAudioSource (juce::MidiKeyboardState& keyState)
         : keyboardState (keyState)
     {
-        for (auto i = 0; i < 4; ++i)
-            synth.addVoice (new SineWaveVoice());
+        for (auto i = 0; i < 20; ++i)
+            synth.addVoice (new SineWaveVoice(i + 1));
 
         synth.addSound (new SineWaveSound());
     }
