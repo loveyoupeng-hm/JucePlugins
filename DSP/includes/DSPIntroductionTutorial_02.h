@@ -58,7 +58,7 @@ class CustomOscillator
 {
 public:
     //==============================================================================
-    CustomOscillator()
+    CustomOscillator(): harm {1}
     {
         auto& osc = processorChain.template get<oscIndex>();
         osc.initialise ([] (Type x)
@@ -75,7 +75,7 @@ public:
     void setFrequency (Type newValue, bool force = false)
     {
         auto& osc = processorChain.template get<oscIndex>();
-        osc.setFrequency (newValue, force);     // [7]
+        osc.setFrequency (newValue * harm, force);     // [7]
     }
 
     //==============================================================================
@@ -104,6 +104,10 @@ public:
         processorChain.prepare (spec); // [3]
     }
 
+    void setHarm(int value) {
+        harm = value;
+    }
+
 private:
     //==============================================================================
     enum
@@ -113,6 +117,7 @@ private:
     };
 
     juce::dsp::ProcessorChain<juce::dsp::Oscillator<Type>, juce::dsp::Gain<Type>> processorChain; // [1]
+    int harm;
 };
 
 //==============================================================================
@@ -146,9 +151,11 @@ public:
         auto velocity = getCurrentlyPlayingNote().noteOnVelocity.asUnsignedFloat();
         auto freqHz = (float) getCurrentlyPlayingNote().getFrequencyInHertz();
 
+        processorChain.get<osc1Index>().setHarm(1);
         processorChain.get<osc1Index>().setFrequency (freqHz, true);
         processorChain.get<osc1Index>().setLevel (velocity);
 
+        processorChain.get<osc2Index>().setHarm(8);    // [3]
         processorChain.get<osc2Index>().setFrequency (freqHz * 1.01f, true);    // [3]
         processorChain.get<osc2Index>().setLevel (velocity);                    // [4]
     }
