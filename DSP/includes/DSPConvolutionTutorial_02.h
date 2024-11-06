@@ -23,7 +23,7 @@
 
  BEGIN_JUCE_PIP_METADATA
 
- name:             DSPIntroductionTutorial
+ name:             DSPConvolutionTutorial
  version:          2.0.0
  vendor:           JUCE
  website:          http://juce.com
@@ -46,9 +46,9 @@
 
 
 #pragma once
-
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_audio_basics/juce_audio_basics.h>
+#include <juce_audio_utils/juce_audio_utils.h>
 #include <juce_dsp/juce_dsp.h>
 #include "JucePluginDefines.h"
 
@@ -58,66 +58,212 @@ class CustomOscillator
 {
 public:
     //==============================================================================
-    CustomOscillator(): harm {1}
+    CustomOscillator()
     {
-        auto& osc = processorChain.template get<oscIndex>();
-        osc.initialise ([] (Type x)
+        setWaveform (Waveform::sine);
+
+        auto& gain = processorChain.template get<gainIndex>();
+        gain.setRampDurationSeconds (3e-2);
+        gain.setGainLinear (Type (0));
+    }
+
+    //==============================================================================
+    enum class Waveform
+    {
+        sine,
+        saw
+    };
+
+    void setWaveform (Waveform waveform)
+    {
+        switch (waveform)
         {
-            return juce::jmap (x,
-                               Type (-juce::MathConstants<double>::pi),
-                               Type (juce::MathConstants<double>::pi),
-                               Type (-1),
-                               Type (1));
-        }, 2);
+        case Waveform::sine:
+            processorChain.template get<oscIndex>().initialise ([] (Type x)
+            {
+               return std::sin (x);
+            }, 128);
+            break;
+
+        case Waveform::saw:
+            processorChain.template get<oscIndex>().initialise ([] (Type x)
+            {
+               return juce::jmap (x,
+                                  Type (-juce::MathConstants<double>::pi),
+                                  Type (juce::MathConstants<double>::pi),
+                                  Type (-1),
+                                  Type (1));
+            }, 128);
+            break;
+
+        default:
+            jassertfalse;
+            break;
+        }
     }
 
     //==============================================================================
     void setFrequency (Type newValue, bool force = false)
     {
-        auto& osc = processorChain.template get<oscIndex>();
-        osc.setFrequency (newValue * harm, force);     // [7]
+        processorChain.template get<oscIndex>().setFrequency (newValue, force);
     }
 
-    //==============================================================================
     void setLevel (Type newValue)
     {
-        auto& gain = processorChain.template get<gainIndex>();
-        gain.setGainLinear (newValue);          // [8]
+        processorChain.template get<gainIndex>().setGainLinear (newValue);
     }
 
-    //==============================================================================
     void reset() noexcept
     {
-         processorChain.reset(); // [4]
+        processorChain.reset();
     }
 
     //==============================================================================
     template <typename ProcessContext>
     void process (const ProcessContext& context) noexcept
     {
-        processorChain.process (context);       // [9]
+        auto&& outBlock = context.getOutputBlock();
+        auto blockToUse = tempBlock.getSubBlock (0, outBlock.getNumSamples());
+        juce::dsp::ProcessContextReplacing<float> tempContext (blockToUse);
+        processorChain.process (tempContext);
+
+        outBlock.copyFrom (context.getInputBlock()).add (blockToUse);
     }
 
     //==============================================================================
     void prepare (const juce::dsp::ProcessSpec& spec)
     {
-        processorChain.prepare (spec); // [3]
+        tempBlock = juce::dsp::AudioBlock<float> (heapBlock, spec.numChannels, spec.maximumBlockSize);
+        processorChain.prepare (spec);
     }
 
-    void setHarm(int value) {
-        harm = value;
+private:
+    //==============================================================================
+    juce::HeapBlock<char> heapBlock;
+    juce::dsp::AudioBlock<float> tempBlock;
+
+    enum
+    {
+        oscIndex,
+        gainIndex,
+    };
+
+    juce::dsp::ProcessorChain<juce::dsp::Oscillator<Type>, juce::dsp::Gain<Type>> processorChain;
+};
+
+//==============================================================================
+template <typename Type>
+class CabSimulator
+{
+public:
+    //==============================================================================
+    CabSimulator()
+    {
+        auto dir = juce::File::getCurrentWorkingDirectory();
+
+        int numTries = 0;
+
+        while (! dir.getChildFile ("Resources").exists() && numTries++ < 15)
+            dir = dir.getParentDirectory();
+
+        auto& convolution = processorChain.template get<convolutionIndex>();    // [5]
+
+        convolution.loadImpulseResponse (dir.getChildFile ("Resources").getChildFile ("guitar_amp.wav"),
+                                         juce::dsp::Convolution::Stereo::yes,
+                                         juce::dsp::Convolution::Trim::no,
+                                         1024);                                 // [6]
+    }
+
+    //==============================================================================
+    void prepare (const juce::dsp::ProcessSpec& spec)
+    {
+        processorChain.prepare (spec); // [4]
+    }
+
+    //==============================================================================
+    template <typename ProcessContext>
+    void process (const ProcessContext& context) noexcept
+    {
+        processorChain.process (context); // [7]
+    }
+
+    //==============================================================================
+    void reset() noexcept
+    {
+        processorChain.reset(); // [3]
     }
 
 private:
     //==============================================================================
     enum
     {
-        oscIndex,
-        gainIndex   // [2]
+        convolutionIndex // [2]
     };
 
-    juce::dsp::ProcessorChain<juce::dsp::Oscillator<Type>, juce::dsp::Gain<Type>> processorChain; // [1]
-    int harm;
+    juce::dsp::ProcessorChain<juce::dsp::Convolution> processorChain;
+};
+
+//==============================================================================
+template <typename Type>
+class Distortion
+{
+public:
+    //==============================================================================
+    Distortion()
+    {
+        auto& waveshaper = processorChain.template get<waveshaperIndex>(); // [5]
+        //waveshaper.functionToUse = [] (Type x) { return jlimit (Type (-0.1), Type (0.1), x); };
+
+        waveshaper.functionToUse = [] (Type x)
+                                   {
+                                       return std::tanh (x);
+                                   };
+
+        auto& preGain = processorChain.template get<preGainIndex>();
+        preGain.setGainDecibels (30.0f);
+
+        auto& postGain = processorChain.template get<postGainIndex>();
+        //postGain.setGainDecibels (-20.0f);
+        postGain.setGainDecibels (0.0f);
+    }
+
+    //==============================================================================
+    void prepare (const juce::dsp::ProcessSpec& spec)
+    {
+        auto& filter = processorChain.template get<filterIndex>();                      // [3]
+        filter.state = FilterCoefs::makeFirstOrderHighPass (spec.sampleRate, 1000.0f);  // [4]
+
+        processorChain.prepare (spec);
+    }
+
+    //==============================================================================
+    template <typename ProcessContext>
+    void process (const ProcessContext& context) noexcept
+    {
+        processorChain.process (context); // [7]
+    }
+
+    //==============================================================================
+    void reset() noexcept
+    {
+        processorChain.reset();     // [3]
+    }
+
+private:
+    //==============================================================================
+    enum
+    {
+        filterIndex,        // [2]
+        preGainIndex,
+        waveshaperIndex,
+        postGainIndex
+    };
+
+    using Filter = juce::dsp::IIR::Filter<Type>;
+    using FilterCoefs = juce::dsp::IIR::Coefficients<Type>;
+
+    juce::dsp::ProcessorChain<juce::dsp::ProcessorDuplicator<Filter, FilterCoefs>,
+                              juce::dsp::Gain<Type>, juce::dsp::WaveShaper<Type>, juce::dsp::Gain<Type>> processorChain;
 };
 
 //==============================================================================
@@ -126,23 +272,31 @@ class Voice  : public juce::MPESynthesiserVoice
 public:
     Voice()
     {
+        lfo.initialise ([] (float x)
+                        {
+                            return std::sin (x);
+                        }, 128);
+        lfo.setFrequency (3.0f);
+
+        auto waveform = CustomOscillator<float>::Waveform::saw;
+        processorChain.get<osc1Index>().setWaveform (waveform);
+        processorChain.get<osc2Index>().setWaveform (waveform);
+
         auto& masterGain = processorChain.get<masterGainIndex>();
         masterGain.setGainLinear (0.7f);
 
         auto& filter = processorChain.get<filterIndex>();
-        filter.setCutoffFrequencyHz (1000.0f);          // [3]
-        filter.setResonance (0.7f);                     // [4]
-        lfo.initialise ([] (float x) { return std::sin(x); }, 128);
-        lfo.setFrequency (3.0f);
+        filter.setMode (juce::dsp::LadderFilter<float>::Mode::LPF24);
+        filter.setResonance (0.7f);
+        filter.setCutoffFrequencyHz (500.0f);
     }
 
     //==============================================================================
     void prepare (const juce::dsp::ProcessSpec& spec)
     {
+        lfo.prepare ({ spec.sampleRate / lfoDownsamplingRatio, spec.maximumBlockSize, 1 });
         tempBlock = juce::dsp::AudioBlock<float> (heapBlock, spec.numChannels, spec.maximumBlockSize);
         processorChain.prepare (spec);
-
-        lfo.prepare ({ spec.sampleRate / lfoUpdateRate, spec.maximumBlockSize, spec.numChannels }); // [4]
     }
 
     //==============================================================================
@@ -151,21 +305,19 @@ public:
         auto velocity = getCurrentlyPlayingNote().noteOnVelocity.asUnsignedFloat();
         auto freqHz = (float) getCurrentlyPlayingNote().getFrequencyInHertz();
 
-        processorChain.get<osc1Index>().setHarm(1);
         processorChain.get<osc1Index>().setFrequency (freqHz, true);
         processorChain.get<osc1Index>().setLevel (velocity);
 
-        processorChain.get<osc2Index>().setHarm(1);    // [3]
-        processorChain.get<osc2Index>().setFrequency (freqHz * 1.01f, true);    // [3]
-        processorChain.get<osc2Index>().setLevel (velocity);                    // [4]
+        processorChain.get<osc2Index>().setFrequency (1.01f * freqHz, true);
+        processorChain.get<osc2Index>().setLevel (velocity);
     }
 
     //==============================================================================
-    void notePitchbendChanged() override
+    void notePitchbendChanged () override
     {
         auto freqHz = (float) getCurrentlyPlayingNote().getFrequencyInHertz();
         processorChain.get<osc1Index>().setFrequency (freqHz);
-        processorChain.get<osc2Index>().setFrequency (freqHz * 1.01f);          // [5]
+        processorChain.get<osc2Index>().setFrequency (1.01f * freqHz);
     }
 
     //==============================================================================
@@ -176,36 +328,27 @@ public:
 
     //==============================================================================
     void notePressureChanged() override {}
-    void noteTimbreChanged()   override {}
+    void noteTimbreChanged() override   {}
     void noteKeyStateChanged() override {}
 
     //==============================================================================
-
-    void renderNextBlock (juce::AudioBuffer<double>&, int, int) override {}
     void renderNextBlock (juce::AudioBuffer<float>& outputBuffer, int startSample, int numSamples) override
     {
-        auto output = tempBlock.getSubBlock (0, (size_t) numSamples);
-        output.clear();
-
-        for (size_t pos = 0; pos < (size_t) numSamples;)
+        for (int i = 0; i < numSamples; ++i)
         {
-            auto max = juce::jmin ((size_t) numSamples - pos, lfoUpdateCounter);
-            auto block = output.getSubBlock (pos, max);
-
-            juce::dsp::ProcessContextReplacing<float> context (block);
-            processorChain.process (context);
-
-            pos += max;
-            lfoUpdateCounter -= max;
-
-            if (lfoUpdateCounter == 0)
+            if (--lfoProcessingIndex == 0)
             {
-                lfoUpdateCounter = lfoUpdateRate;
-                auto lfoOut = lfo.processSample (0.0f);                                 // [5]
-                auto curoffFreqHz = juce::jmap (lfoOut, -1.0f, 1.0f, 100.0f, 2000.0f);  // [6]
-                processorChain.get<filterIndex>().setCutoffFrequencyHz (curoffFreqHz);  // [7]
+                lfoProcessingIndex = lfoDownsamplingRatio;
+                auto lfoOut = lfo.processSample (0.0f);
+                auto cutoffHz = juce::jmap (lfoOut, -1.0f, 1.0f, 100.0f, 4e3f);
+                processorChain.get<filterIndex>().setCutoffFrequencyHz (cutoffHz);
             }
         }
+
+        auto block = tempBlock.getSubBlock (0, (size_t) numSamples);
+        block.clear();
+        juce::dsp::ProcessContextReplacing<float> context (block);
+        processorChain.process (context);
 
         juce::dsp::AudioBlock<float> (outputBuffer)
             .getSubBlock ((size_t) startSample, (size_t) numSamples)
@@ -221,28 +364,28 @@ private:
     {
         osc1Index,
         osc2Index,
-        filterIndex,        // [2]
+        filterIndex,
         masterGainIndex
     };
 
     juce::dsp::ProcessorChain<CustomOscillator<float>, CustomOscillator<float>,
-                              juce::dsp::LadderFilter<float>, juce::dsp::Gain<float>> processorChain; // [1]
+                              juce::dsp::LadderFilter<float>, juce::dsp::Gain<float>> processorChain;
 
-    static constexpr size_t lfoUpdateRate = 100;
-    size_t lfoUpdateCounter = lfoUpdateRate;
-    juce::dsp::Oscillator<float> lfo;   // [1]
+    static constexpr size_t lfoDownsamplingRatio = 128;
+    size_t lfoProcessingIndex = lfoDownsamplingRatio;
+    juce::dsp::Oscillator<float> lfo;
 };
 
 //==============================================================================
 class AudioEngine  : public juce::MPESynthesiser
 {
 public:
-    static constexpr auto maxNumVoices = 4;
+    static constexpr size_t maxNumVoices = 4;
 
     //==============================================================================
     AudioEngine()
     {
-        for (auto i = 0; i < maxNumVoices; ++i)
+        for (size_t i = 0; i < maxNumVoices; ++i)
             addVoice (new Voice);
 
         setVoiceStealingEnabled (true);
@@ -256,29 +399,29 @@ public:
         for (auto* v : voices)
             dynamic_cast<Voice*> (v)->prepare (spec);
 
-        fxChain.prepare (spec);     // [3]
+        fxChain.prepare (spec);
     }
-    //==============================================================================
-    void renderNextSubBlock (juce::AudioBuffer<double>&, int, int) override {}
 
 private:
+    //==============================================================================
+    enum
+    {
+        distortionIndex,
+        cabSimulatorIndex,
+        reverbIndex
+    };
+
+    juce::dsp::ProcessorChain<Distortion<float>, CabSimulator<float>, juce::dsp::Reverb> fxChain;
+
     //==============================================================================
     void renderNextSubBlock (juce::AudioBuffer<float>& outputAudio, int startSample, int numSamples) override
     {
         MPESynthesiser::renderNextSubBlock (outputAudio, startSample, numSamples);
 
-        auto block = juce::dsp::AudioBlock<float> (outputAudio);                            // [4]
-        auto blockToUse = block.getSubBlock ((size_t) startSample, (size_t) numSamples);    // [5]
-        auto contextToUse = juce::dsp::ProcessContextReplacing<float> (blockToUse);         // [6]
-        fxChain.process (contextToUse);                                                     // [7]
+        auto block = juce::dsp::AudioBlock<float> (outputAudio).getSubBlock ((size_t) startSample, (size_t) numSamples);
+        auto context = juce::dsp::ProcessContextReplacing<float> (block);
+        fxChain.process (context);
     }
-
-    enum
-    {
-        reverbIndex // [2]
-    };
-
-    juce::dsp::ProcessorChain<juce::dsp::Reverb> fxChain;   // [1]
 };
 
 //==============================================================================
@@ -517,8 +660,6 @@ public:
 
         return true;
     }
-
-    void processBlock (juce::AudioBuffer<double>&, juce::MidiBuffer&) override {}
 
     void processBlock (juce::AudioSampleBuffer& buffer, juce::MidiBuffer& midiMessages) override
     {
