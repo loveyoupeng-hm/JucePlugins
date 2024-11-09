@@ -332,6 +332,8 @@ public:
     void noteKeyStateChanged() override {}
 
     //==============================================================================
+    void renderNextBlock (juce::AudioBuffer<double>&, int, int) override
+    {}
     void renderNextBlock (juce::AudioBuffer<float>& outputBuffer, int startSample, int numSamples) override
     {
         for (int i = 0; i < numSamples; ++i)
@@ -414,6 +416,8 @@ private:
     juce::dsp::ProcessorChain<Distortion<float>, CabSimulator<float>, juce::dsp::Reverb> fxChain;
 
     //==============================================================================
+    void renderNextSubBlock (juce::AudioBuffer<double>&, int, int) override
+    {}
     void renderNextSubBlock (juce::AudioBuffer<float>& outputAudio, int startSample, int numSamples) override
     {
         MPESynthesiser::renderNextSubBlock (outputAudio, startSample, numSamples);
@@ -660,6 +664,8 @@ public:
 
         return true;
     }
+    void processBlock (juce::AudioBuffer<double>&, juce::MidiBuffer&) override
+    {}
 
     void processBlock (juce::AudioSampleBuffer& buffer, juce::MidiBuffer& midiMessages) override
     {

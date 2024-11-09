@@ -39,6 +39,18 @@
                 "MIMode": "gdb",
                 "miDebuggerPath": "/usr/bin/gdb"
             }
+        },
+        {
+            "name": "Host Launch",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/Host/HOST_artefacts/Debug/Standalone/HOST",
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "linux": {
+                "MIMode": "gdb",
+                "miDebuggerPath": "/usr/bin/gdb"
+            }
         }
     ]
 }
