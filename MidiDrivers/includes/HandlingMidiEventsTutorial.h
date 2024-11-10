@@ -195,14 +195,20 @@ private:
         // midiDevice->sendMessageNow(enableFader);
         midiDevice->sendMessageNow(selectSessionLayout);
         midiDevice->sendMessageNow(clearSession);
+        int channel = 1;
         for (uint row = 0;row < 8;++row)
         {
             for (uint col = 0;col < 8;++col)
             {
                 u_char note = 11 + (row * 8) + col;
                 u_char color = 44 + (col * 8) + row;
-                midiDevice->sendMessageNow(juce::MidiMessage{new uint8[9]{0x90, note, color}, 3});
+                juce::MidiMessage msg {new uint8[9]{0x90, note, color}, 3};
+                msg.setChannel(channel);
+                midiDevice->sendMessageNow(msg);
             }
+            channel++;
+            if(channel > 3)
+                channel = 1;
         }
 
         lastInputIndex = index;
