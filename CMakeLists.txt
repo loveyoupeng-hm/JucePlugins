@@ -30,10 +30,13 @@ CPMAddPackage(
 
 add_compile_options(-Wall -Wextra -Wpedantic)
 
+include_directories(includes)
+
 add_subdirectory(ArpeggiatorPlugin)
 add_subdirectory(HelloWorld)
 add_subdirectory(Synth)
 add_subdirectory(WaveTable)
 add_subdirectory(DSP)
 add_subdirectory(Host)
+add_subdirectory(MidiDrivers)
 add_subdirectory(Tests)

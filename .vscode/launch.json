@@ -51,6 +51,18 @@
                 "MIMode": "gdb",
                 "miDebuggerPath": "/usr/bin/gdb"
             }
+        },
+        {
+            "name": "MidiDrivers Launch",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/MidiDrivers/MidiDrivers_artefacts/Debug/MidiDrivers",
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "linux": {
+                "MIMode": "gdb",
+                "miDebuggerPath": "/usr/bin/gdb"
+            }
         }
     ]
 }
