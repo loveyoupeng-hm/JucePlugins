@@ -18,6 +18,7 @@ target_link_libraries(
     ${PROJECT_NAME}
     PRIVATE
         HelloWorld
+        juce::juce_dsp
         GTest::gtest_main
 )
 
