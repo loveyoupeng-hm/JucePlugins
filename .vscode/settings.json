@@ -2,5 +2,6 @@
     "files.associations": {
         ".fantomasignore": "ignore",
         "*.mm": "cpp"
-    }
+    },
+    "cmake.cmakePath": "/usr/bin/cmake"
 }
