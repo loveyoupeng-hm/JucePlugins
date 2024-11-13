@@ -56,7 +56,7 @@
             "name": "MidiDrivers Launch",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/MidiDrivers/MidiDrivers_artefacts/Debug/MidiDrivers",
+            "program": "${workspaceFolder}/build/MidiDrivers/MidiDrivers_artefacts/Debug/Standalone/MidiDrivers",
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "linux": {

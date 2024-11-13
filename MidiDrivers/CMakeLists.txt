@@ -2,12 +2,14 @@ cmake_minimum_required(VERSION 3.28)
 
 project(MidiDrivers VERSION ${PROJECT_VERSION})
 
-juce_add_gui_app(
+juce_add_plugin(
     ${PROJECT_NAME}
     COMPANY_NAME loveyoupeng
-    IS_SYNTH FALSE 
+    IS_SYNTH FALSE
+    IS_MIDI_EFFECT TRUE
     NEEDS_MIDI_INPUT TRUE
     NEEDS_MIDI_OUTPUT TRUE
+    FORMATS Standalone
 )
 
 target_compile_definitions(
