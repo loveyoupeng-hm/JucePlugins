@@ -9,7 +9,7 @@ juce_add_plugin(
     IS_MIDI_EFFECT TRUE
     NEEDS_MIDI_INPUT TRUE
     NEEDS_MIDI_OUTPUT TRUE
-    FORMATS Standalone
+    FORMATS VST3 Standalone
 )
 
 target_compile_definitions(
@@ -17,8 +17,7 @@ target_compile_definitions(
     PUBLIC 
         JUCE_WEB_BROWSER=0
         JUCE_USE_CURL=0
-        JUCE_APPLICATION_NAME_STRING="$<TARGET_PROPERTY:Synth,JUCE_PRODUCT_NAME>"
-        JUCE_APPLICATION_VERSION_STRING="$<TARGET_PROPERTY:Synth,JUCE_VERSION>"
+        JUCE_VST3_CAN_REPLACE_VST2=0
 )
 
 target_link_libraries(

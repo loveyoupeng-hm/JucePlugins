@@ -46,13 +46,13 @@
 
 #pragma once
 
-#include <iostream>
+#include <string>
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_audio_basics/juce_audio_basics.h>
 #include <juce_audio_utils/juce_audio_utils.h>
 #include <juce_dsp/juce_dsp.h>
-#include "JucePluginDefines.h"
-#include "JuceHeader.h"
+
+using namespace juce;
 
 //==============================================================================
 class MainProcessor : public juce::AudioProcessor
@@ -69,6 +69,14 @@ public:
     {
         ignoreUnused(samplesPerBlock);
         ignoreUnused(sampleRate);
+
+        auto header = getPlayHead();
+
+        if (editor && header)
+        {
+            auto value = "Host BPM:";// + juce::String(header->getPosition()->getBpm().orFallback(0.0));
+            editor->logMessage(value);
+        }
     }
 
     void releaseResources() override {}
@@ -95,7 +103,6 @@ public:
         //     else if (msg.isNoteOff())
         //         notes.removeValue(msg.getNoteNumber());
         // }
-
 
         // if ((time + numSamples) >= noteDuration)
         // {
@@ -124,7 +131,11 @@ public:
     bool isMidiEffect() const override { return true; }
 
     //==============================================================================
-    AudioProcessorEditor *createEditor() override { return new MainContentComponent(*this); }
+    AudioProcessorEditor *createEditor() override
+    {
+        editor = new MainContentComponent(*this);
+        return editor;
+    }
     bool hasEditor() const override { return true; }
 
     //==============================================================================
@@ -240,6 +251,12 @@ private:
             midiMessagesBox.setBounds(area.reduced(8));
         }
 
+        void logMessage(const juce::String &m)
+        {
+            midiMessagesBox.moveCaretToEnd();
+            midiMessagesBox.insertTextAtCaret(m + juce::newLine);
+        }
+
     private:
         static juce::String getMidiMessageDescription(const juce::MidiMessage &m)
         {
@@ -275,11 +292,7 @@ private:
             return juce::String::toHexString(m.getRawData(), m.getRawDataSize());
         }
 
-        void logMessage(const juce::String &m)
-        {
-            midiMessagesBox.moveCaretToEnd();
-            midiMessagesBox.insertTextAtCaret(m + juce::newLine);
-        }
+        
 
         /** Starts listening to a MIDI input device, enabling it if necessary. */
         void setMidiInput(int index)
@@ -310,7 +323,7 @@ private:
                         for (uint col = 0; col < 8; ++col)
                         {
                             u_char note = 11 + (row * 8) + col;
-                            u_char color = 44 + (col * 8) + row;
+                            u_char color = 24 + (col * 8) + row;
                             juce::MidiMessage msg{new uint8[9]{0x90, note, color}, 3};
                             msg.setChannel(channel);
                             midiDevice->sendMessageNow(msg);
@@ -318,6 +331,21 @@ private:
                         channel++;
                         if (channel > 3)
                             channel = 1;
+                    }
+
+                    juce::MidiMessage up{new uint8[9]{0xB0, 0x5B, 13}, 3};
+                    midiDevice->sendMessageNow(up);
+                    juce::MidiMessage down{new uint8[9]{0xB0, 0x5C, 13}, 3};
+                    midiDevice->sendMessageNow(down);
+                    juce::MidiMessage left{new uint8[9]{0xB0, 0x5D, 50}, 3};
+                    midiDevice->sendMessageNow(left);
+                    juce::MidiMessage right{new uint8[9]{0xB0, 0x5E, 50}, 3};
+                    midiDevice->sendMessageNow(right);
+
+                    for (int i = 0; i < 8; i++)
+                    {
+                        juce::MidiMessage scene{new uint8[9]{0xB0, static_cast<uint8>(i * 10 + 19), static_cast<uint8>(25 + i)}, 3};
+                        midiDevice->sendMessageNow(scene);
                     }
                 }
             }
@@ -428,6 +456,7 @@ private:
         //==============================================================================
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MainContentComponent)
     };
+    MainContentComponent *editor;
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MainProcessor)
 };
 const uint8 MainProcessor::MainContentComponent::enableDAWSysex[] = {0xF0, 0x00, 0x20, 0x29, 0x02, 0x0D, 0x10, 0x01, 0xF7};
